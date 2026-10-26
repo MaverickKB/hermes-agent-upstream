@@ -105,6 +105,7 @@ def _output_file_in_dir(output, default_name: str):
     one): an existing directory, or one spelled with a trailing separator, means ``<dir>/<default_name>``."""
     if not output or output == "-":
         return output
+    output = os.path.expanduser(output)
     if output.endswith(("/", os.sep)) or os.path.isdir(output):
         os.makedirs(output, exist_ok=True)
         return os.path.join(output, default_name)
