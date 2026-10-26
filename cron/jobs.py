@@ -2827,7 +2827,14 @@ def _sweep_completed_oneshots(
     retention_days = _completed_oneshot_retention_days()
     if retention_days <= 0:
         return False
-    cutoff = now - timedelta(days=retention_days)
+    try:
+        cutoff = now - timedelta(days=retention_days)
+    except (ValueError, OverflowError):
+        logger.warning(
+            "Skipping completed one-shot retention sweep for invalid cron.completed_retention_days=%r",
+            retention_days,
+        )
+        return False
     removed = False
     for rj in list(raw_jobs):
         try:
