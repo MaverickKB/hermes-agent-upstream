@@ -2,6 +2,7 @@
 
 import json
 import sys
+from pathlib import Path
 
 import hermes_state
 import hermes_cli.main as main_mod
@@ -48,3 +49,43 @@ def test_jsonl_export_to_file_path_is_unchanged(monkeypatch, tmp_path):
 
     assert json.loads(target.read_text(encoding="utf-8"))["id"] == "sess-123"
     assert target.is_file() and not (tmp_path / "hermes_session_sess-123.jsonl").exists()
+
+
+def test_jsonl_export_expands_user_directory(monkeypatch, tmp_path, capsys):
+    home = tmp_path / "home"
+    work = tmp_path / "work"
+    home.mkdir()
+    work.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
+    monkeypatch.chdir(work)
+
+    _export(monkeypatch, "~/My Exports/")
+
+    written = home / "My Exports" / "hermes_session_sess-123.jsonl"
+    output = capsys.readouterr().out
+    reported = output.strip().removeprefix("Exported 1 session to ")
+    assert json.loads(written.read_text(encoding="utf-8"))["id"] == "sess-123"
+    assert Path(reported) == written
+    assert not (work / "~").exists()
+
+
+def test_jsonl_export_expands_user_file(monkeypatch, tmp_path, capsys):
+    home = tmp_path / "home"
+    work = tmp_path / "work"
+    output_dir = home / "My Exports"
+    output_dir.mkdir(parents=True)
+    work.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
+    monkeypatch.chdir(work)
+
+    _export(monkeypatch, "~/My Exports/chosen.jsonl")
+
+    written = output_dir / "chosen.jsonl"
+    output = capsys.readouterr().out
+    reported = output.strip().removeprefix("Exported 1 session to ")
+    assert json.loads(written.read_text(encoding="utf-8"))["id"] == "sess-123"
+    assert Path(reported) == written
+    assert not (output_dir / "hermes_session_sess-123.jsonl").exists()
+    assert not (work / "~").exists()
