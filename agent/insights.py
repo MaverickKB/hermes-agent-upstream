@@ -465,7 +465,7 @@ class InsightsEngine:
     def _compute_top_sessions(self, sessions: list[dict]) -> list[dict]:
         """Notable sessions (longest, most messages, most tokens, most tool calls)."""
         top = []
-        timed = [s for s in sessions if s.get("started_at") and s.get("ended_at")]
+        timed = [s for s in sessions if s.get("started_at") and s.get("ended_at") and s["ended_at"] > s["started_at"]]
         if timed:
             longest = max(timed, key=lambda s: s["ended_at"] - s["started_at"])
             top.append({"label": "Longest session", "session_id": longest["id"][:16],
