@@ -16018,20 +16018,35 @@ async function dispatchRegistryApiRequest(
   // SSH tunnel / remote dashboard. A passive read never dials, so it stays
   // OUT of the claim: an interactive open coalescing onto an in-flight
   // passive read would otherwise inherit its "no warm backend" rejection.
-  const connection: any = request?.passive
-    ? await ensureRegistryBackend(registryConnectionId, routeProfile, '', { passive: true })
-    : await backendDialClaims.run(backendScopeKey(registryConnectionId, routeProfile), () =>
+  const ensureConnection = () => request?.passive
+    ? ensureRegistryBackend(registryConnectionId, routeProfile, '', { passive: true })
+    : backendDialClaims.run(backendScopeKey(registryConnectionId, routeProfile), () =>
         ensureRegistryBackend(registryConnectionId, routeProfile)
       )
 
+  const connection: any = await ensureConnection()
+
   const requestPath = pathForRegistryBackendRequest(request.path, requestProfile, connection, request?.method || 'GET')
 
-  const response = await fetchJsonForBackend(connection, requestPath, {
+  const send = (current: any) => fetchJsonForBackend(current, requestPath, {
     method: request?.method,
     body: request?.body,
     upload: request?.upload,
     timeoutMs: resolveTimeoutMs(request?.timeoutMs, DEFAULT_FETCH_TIMEOUT_MS)
   })
+
+  // A local gateway descriptor pins the owner that answered the first ensure.
+  // After a gateway restart the cached descriptor's instance_id and control
+  // socket are dead, and a native ticket mint fails. The legacy API path
+  // already re-ensures through redialLocalGateway; the registry path must do
+  // the same or every request fails until the Desktop is restarted.
+  const response = connection.gatewayEndpoint
+    ? await redialLocalGateway({
+        ensure: ensureConnection,
+        forget: () => forgetRegistryLocalGatewayDescriptor(registryConnectionId, routeProfile),
+        use: send
+      })
+    : await send(connection)
 
   desktopProfilePreferences.afterProfileRequest(registryConnectionId, request, response, connection.mode)
 

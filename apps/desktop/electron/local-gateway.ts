@@ -655,8 +655,8 @@ export async function mintLocalGatewayTicket(endpoint: GatewayEndpoint, purpose:
   return new Promise((resolve, reject) => {
     const socket = net.createConnection(socketPath)
     let buffer = ''
-    const deadline = setTimeout(() => socket.destroy(new Error('Gateway ticket deadline')), 5000)
-    socket.on('error', () => reject(new Error('Gateway ticket bootstrap failed')))
+    const deadline = setTimeout(() => socket.destroy(new Error('Gateway ticket deadline')), 15_000)
+    socket.on('error', (error: Error) => reject(new Error(`Gateway ticket bootstrap failed: ${error?.message || String(error)}`)))
     socket.on('close', () => { clearTimeout(deadline); reject(new Error('Gateway ticket connection closed')) })
     socket.on('connect', () => socket.write(JSON.stringify({ protocol: 1, id: 1, verb: 'session-ticket', params: { profile_id: home, instance_id: endpoint.instance_id, purpose, ...ticketScope(purpose) } }) + '\n'))
     socket.on('data', chunk => {
